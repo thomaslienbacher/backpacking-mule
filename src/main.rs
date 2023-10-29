@@ -1,16 +1,17 @@
 use std::env::current_exe;
+use std::mem::swap;
 use std::ops::AddAssign;
 use std::os::unix::raw::uid_t;
 use rand::{Rng, thread_rng};
 use rand::distributions::Uniform;
-use crate::Bag::{Both, Left, Nowhere, Right};
+use crate::Bag::{Both, Add, Nowhere, Sub};
 
 const MAX_WEIGHT: usize = 5;
 
 #[derive(Debug, Copy, Clone)]
 enum Bag {
-    Left,
-    Right,
+    Add,
+    Sub,
     Both,
     Nowhere,
 }
@@ -21,10 +22,10 @@ impl Bag {
             return Both;
         }
         if left {
-            return Left;
+            return Add;
         }
         if right {
-            return Right;
+            return Sub;
         }
         Nowhere
     }
@@ -34,10 +35,10 @@ impl Bag {
             return Both;
         }
         if new < top {
-            return Left;
+            return Add;
         }
         if new > top {
-            return Right;
+            return Sub;
         }
         Nowhere
     }
@@ -51,11 +52,8 @@ fn main() {
 }
 
 fn simulate() {
-    let mut N = 8;
+    let N = 25;
     let mut g: Vec<usize> = thread_rng().sample_iter(Uniform::new(1, MAX_WEIGHT + 1)).take(N).collect();
-    //g = vec![3, 5, 3, 4, 3, 3, 2, 2];
-    //g = vec![3, 5, 3, 4];
-    N = g.len();
     println!("weights: {:?}", g);
 
     let G: usize = g.iter().sum(); // G
@@ -117,17 +115,21 @@ fn simulate() {
         assert!(current.0);
         let gi = g[i - 1] as i64;
         match current.1 {
-            Left | Both => {
+            Add | Both => {
                 left.push(gi);
                 let x = current_x;
                 current_x = (current_x + gi).abs();
                 println!("[{i:2}][{x:2}] adding {gi} to left, going right new x = {current_x}");
             }
-            Right => {
+            Sub => {
                 right.push(gi);
                 let x = current_x;
                 current_x = (current_x - gi).abs();
                 println!("[{i:2}][{x:2}] adding {gi} to right, going left new x = {current_x}");
+                if x - gi < 0 {
+                    println!("switching left and right");
+                    swap(&mut left, &mut right);
+                }
             }
             Nowhere => {
                 let ls: i64 = left.iter().sum();
@@ -155,7 +157,6 @@ fn simulate() {
     print_table(&g, &S, &path);
     assert_eq!(G as i64, ls + rs);
     assert_eq!(lowest_x, (ls - rs).abs());
-
 }
 
 fn print_table(weights: &Vec<usize>, table: &Vec<Vec<Option<(bool, Bag)>>>, path: &Vec<(usize, usize)>) {
@@ -179,8 +180,8 @@ fn print_table(weights: &Vec<usize>, table: &Vec<Vec<Option<(bool, Bag)>>>, path
             if let Some(b) = table[i][x] {
                 let mut char = if b.0 {
                     match b.1 {
-                        Left => { "l" }
-                        Right => { "r" }
+                        Add => { "a" }
+                        Sub => { "s" }
                         Both => { "b" }
                         Nowhere => { "x" }
                     }
